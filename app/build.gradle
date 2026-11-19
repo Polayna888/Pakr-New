@@ -36,6 +36,6 @@ dependencies {
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // Добавлена библиотека для Push-уведомлений RuStore
-    implementation("ru.rustore.sdk:push:2.0.0")
+    // Правильное имя и версия библиотеки RuStore Push
+    implementation("ru.rustore.sdk:pushclient:6.10.0")
 }
