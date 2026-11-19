@@ -22,6 +22,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
+import android.widget.Button // Добавлено для кнопки звонка
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.core.view.WindowCompat
@@ -31,6 +32,9 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import kotlin.math.abs
 
+// Импорты для Push-уведомлений RuStore
+import ru.rustore.sdk.push.RuStorePush
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
@@ -39,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var overlay: View
     private lateinit var spinner: IOSSpinnerView
     private lateinit var loadingText: TextView
+    private lateinit var callButton: Button // Переменная для кнопки звонка
 
     private val handler = Handler(Looper.getMainLooper())
     private var overlayVisible = false
@@ -54,17 +59,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val timeoutRunnable  = Runnable { hideOverlay() }
-    // 用命名 Runnable 管理延迟隐藏，确保可被 removeCallbacks 取消
     private val delayHideRunnable = Runnable { hideOverlay() }
 
-    // 边缘手势阈值
-    private val EDGE_SWIPE_MIN_X = 80f   // 水平位移最小值 px
-    private val EDGE_SWIPE_MAX_Y = 120f  // 垂直位移最大值 px（避免误触）
-    private val EDGE_SWIPE_MIN_V = 200f  // 最小速度 px/s
+    private val EDGE_SWIPE_MIN_X = 80f
+    private val EDGE_SWIPE_MAX_Y = 120f
+    private val EDGE_SWIPE_MIN_V = 200f
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 强制亮色模式，防止系统暗色主题影响 WebView 渲染
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
             androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
         )
@@ -82,16 +84,35 @@ class MainActivity : AppCompatActivity() {
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         setContentView(R.layout.activity_main)
+        
         webView     = findViewById(R.id.webView)
         progressBar = findViewById(R.id.progressBar)
         overlay     = findViewById(R.id.overlay)
         spinner     = findViewById(R.id.spinner)
         loadingText = findViewById(R.id.loadingText)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+        callButton   = findViewById(R.id.callButton) // Инициализация кнопки звонка
+
+        // --- 1. Инициализация RuStore Push ---
+        try {
+            RuStorePush.init(applicationContext)
+        } catch (e: Exception) {
+            // Логируем ошибку, если SDK не подключен
+            e.printStackTrace()
+        }
+
+        // --- 2. Настройка кнопки "Позвонить" ---
+        callButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_DIAL).apply {
+                // ЗАМЕНИТЕ НА ВАШ НОМЕР ТЕЛЕФОНА!
+                data = Uri.parse("tel:+79999999999") 
+            }
+            startActivity(intent)
+        }
+
         swipeRefresh.setColorSchemeColors(
             android.graphics.Color.parseColor("#6366F1")
         )
-        // 触发距离设为 140dp（接近 Chrome），避免轻划误触
         val density = resources.displayMetrics.density
         val triggerDp = 120
         try {
@@ -103,7 +124,6 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh.setProgressViewOffset(false, 0, (triggerDp * density).toInt())
         swipeRefresh.setOnRefreshListener {
             forceShowOverlay()
-            // 稍等 50ms 再 reload，确保 overlay 已完全显示后才清空页面
             handler.postDelayed({ webView.reload() }, 50)
         }
         showOverlay()
@@ -113,8 +133,6 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        // 防止加载过程中白屏：设置 WebView 背景与 overlay 一致
-        webView.setBackgroundColor(android.graphics.Color.WHITE)
         webView.setBackgroundColor(android.graphics.Color.WHITE)
         webView.settings.apply {
             javaScriptEnabled                = true
@@ -131,8 +149,11 @@ class MainActivity : AppCompatActivity() {
             allowFileAccess                  = true
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(true)
+            
+            // --- 3. Настройки для офлайн-режима (кэширование) ---
+            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         }
-        // 开启 Service Worker（支持 PWA 类网站）
+        
         try {
             android.webkit.ServiceWorkerController.getInstance().serviceWorkerWebSettings?.apply {
                 allowContentAccess = true
@@ -143,13 +164,14 @@ class MainActivity : AppCompatActivity() {
                     override fun shouldInterceptRequest(request: WebResourceRequest) = null
                 })
         } catch (_: Exception) {}
+        
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(webView, true)
         }
+        
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                // 每次新页面/刷新必须强制显示 overlay，不受上次状态影响
                 handler.removeCallbacks(delayHideRunnable)
                 forceShowOverlay()
             }
@@ -158,8 +180,6 @@ class MainActivity : AppCompatActivity() {
                 swipeRefresh.isRefreshing = false
                 fetchThemeColor(view)
                 handler.removeCallbacks(delayHideRunnable)
-                // 用 JS 检测页面真正渲染完成（两帧后），再隐藏 overlay
-                // 超时兜底：1200ms 强制隐藏
                 handler.postDelayed(delayHideRunnable, 1200)
                 view.evaluateJavascript("""
                     (function(){
@@ -178,12 +198,10 @@ class MainActivity : AppCompatActivity() {
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
-                // 非 http/https 协议（intent://, mailto:, tel: 等）交给系统处理
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) {}
                     return true
                 }
-                // http/https 全部在 WebView 内处理，包括 OAuth/SSO 重定向
                 return false
             }
 
@@ -196,13 +214,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // 修复：SSL 证书错误默认会取消加载白屏，直接放行
             @Suppress("WebViewClientOnReceivedSslError")
             override fun onReceivedSslError(view: WebView, handler: android.webkit.SslErrorHandler, error: android.net.http.SslError) {
                 handler.proceed()
             }
 
-            // 修复：HTTP 4xx/5xx 错误显示友好页面
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: android.webkit.WebResourceResponse) {
                 if (request.isForMainFrame && (errorResponse.statusCode >= 400)) {
                     swipeRefresh.isRefreshing = false
@@ -212,12 +228,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 progressBar.setProgress(newProgress)
-                // 新页面开始加载时（progress 重置为低值）补充触发 showOverlay
                 if (newProgress <= 5) showOverlay()
-                // overlay 隐藏统一由 onPageFinished 负责，这里不再提前触发
             }
             override fun onPermissionRequest(request: PermissionRequest) {
                 request.grant(request.resources)
@@ -250,10 +265,8 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 fileChooserCallbackRef?.onReceiveValue(null)
                 fileChooserCallbackRef = filePathCallback
-                // 上传前切换为桌面UA，确保ChatGPT不拦截上传请求
                 webView.settings.userAgentString = DESKTOP_UA
                 try {
-                    // 创建相机临时文件
                     val photoFile = java.io.File(
                         cacheDir,
                         "webview_uploads/camera_${System.currentTimeMillis()}.jpg"
@@ -279,6 +292,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         }
+        
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
             try {
                 val uri = Uri.parse(url)
@@ -299,13 +313,12 @@ class MainActivity : AppCompatActivity() {
                 try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
             }
         }
-        // 键盘弹出适配：全屏模式下 adjustResize 失效，手动监听 IME Insets 调整容器高度
+        
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh) { view, insets ->
             val imeInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val lp = view.layoutParams as android.widget.FrameLayout.LayoutParams
             lp.bottomMargin = imeInsets.bottom
             view.layoutParams = lp
-            // WebView padding 清零，用 marginBottom 控制
             webView.setPadding(0, 0, 0, 0)
             insets
         }
@@ -319,26 +332,23 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {}
             }
         }, "ThemeBridge")
+        
         webView.addJavascriptInterface(object {
             @JavascriptInterface
             fun onPageReady() {
-                // JS 确认页面两帧后真正渲染完成，取消超时兜底并立即隐藏 overlay
                 handler.post {
                     handler.removeCallbacks(delayHideRunnable)
                     hideOverlay()
                 }
             }
         }, "_pakrBridge")
-        // UA：移动版 Chrome（无 wv 标识），上传时临时切桌面UA
+        
         webView.settings.userAgentString = MOBILE_UA
-        // 实时控制：WebView 不在顶部时禁用下拉刷新，防止滚动误触和打断 CF 验证
-        // 防误触：只有页面静止在顶部时才启用下拉刷新
         var lastScrollY = 0
         var isTouching = false
         webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
             lastScrollY = scrollY
             if (!isTouching) {
-                // 手指不在屏幕上时（fling 中），页面不在顶部就禁用
                 if (scrollY > 0) swipeRefresh.isEnabled = false
             }
         }
@@ -346,17 +356,14 @@ class MainActivity : AppCompatActivity() {
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     isTouching = true
-                    // 手指按下时根据当前位置决定是否启用
                     swipeRefresh.isEnabled = (lastScrollY == 0)
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
-                    // 滑动过程中不在顶部就立即禁用
                     if (lastScrollY > 0) swipeRefresh.isEnabled = false
                 }
                 android.view.MotionEvent.ACTION_UP,
                 android.view.MotionEvent.ACTION_CANCEL -> {
                     isTouching = false
-                    // 手指抬起后延迟 300ms 再判断（等 fling 惯性结束）
                     swipeRefresh.isEnabled = false
                     handler.postDelayed({
                         swipeRefresh.isEnabled = (lastScrollY == 0)
@@ -404,7 +411,6 @@ class MainActivity : AppCompatActivity() {
         handler.postDelayed(timeoutRunnable, 30_000L)
     }
 
-    // 边缘滑动手势：左边缘右滑=后退，右边缘左滑=前进
     @android.annotation.SuppressLint("ClickableViewAccessibility")
     private fun setupEdgeSwipe() {
         val edgeLeft  = findViewById<View>(R.id.edgeLeft)
@@ -443,7 +449,6 @@ class MainActivity : AppCompatActivity() {
         edgeRight.setOnTouchListener { _, e -> rightGesture.onTouchEvent(e) }
     }
 
-    // 强制显示 overlay，不受 overlayVisible 守卫限制（用于 reload 等场景）
     private fun forceShowOverlay() {
         overlayVisible = false
         showOverlay()
@@ -456,7 +461,6 @@ class MainActivity : AppCompatActivity() {
         overlayVisible = false
         overlay.animate().cancel()
         overlay.animate().alpha(0f).setDuration(300).withEndAction {
-            // 守卫：动画期间如果 showOverlay 再次被触发，不强制隐藏
             if (!overlayVisible) {
                 overlay.visibility = View.GONE
                 spinner.stop()
@@ -501,26 +505,24 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
-        // 切回 App 时不主动操作 overlay，让 WebView 自然恢复
     }
 
     override fun onPause() {
         super.onPause()
-        webView.onPause()           // 暂停 JS 执行，省电
+        webView.onPause()
         webView.pauseTimers()
         CookieManager.getInstance().flush()
     }
 
     override fun onStop() {
         super.onStop()
-        CookieManager.getInstance().flush()  // 强杀时也持久化 Cookie
+        CookieManager.getInstance().flush()
     }
+    
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        // 清理文件选择回调，防止内存泄漏
         fileChooserCallbackRef?.onReceiveValue(null)
         fileChooserCallbackRef = null
-        // 先从父布局移除再 destroy，防止 WebView 内存泄漏
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         webView.destroy()
         super.onDestroy()
@@ -534,11 +536,9 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == FILE_CHOOSER_REQUEST) {
             val results: Array<Uri>? = if (resultCode == RESULT_OK) {
                 when {
-                    // 相机拍照：data 为 null 或 data.data 为 null
                     (data == null || data.data == null) && cameraImageUri != null -> {
                         arrayOf(cameraImageUri!!)
                     }
-                    // 多选文件
                     data?.clipData != null -> {
                         val clip = data.clipData!!
                         Array(clip.itemCount) { i ->
@@ -547,7 +547,6 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                    // 单选文件
                     data?.data != null -> {
                         val uri = data.data!!
                         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -559,14 +558,11 @@ class MainActivity : AppCompatActivity() {
             fileChooserCallbackRef?.onReceiveValue(results)
             fileChooserCallbackRef = null
             cameraImageUri = null
-            // 上传完成后恢复移动UA
             webView.settings.userAgentString = MOBILE_UA
         }
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
     }
-
-
 
     companion object {
         const val APP_URL   = "{{APP_URL}}"
