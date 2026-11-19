@@ -30,7 +30,7 @@ jobs:
         with:
           java-version: '17'
           distribution: temurin
-          cache: gradle
+          # Убрали 'cache: gradle', чтобы не было ошибки 503
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -42,14 +42,7 @@ jobs:
         with:
           gradle-version: 8.2
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
+      # ШАГ С КЭШЕМ УДАЛЕН
 
       - name: Inject parameters
         env:
