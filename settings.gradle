@@ -6,8 +6,8 @@ dependencyResolutionManagement {
     repositories { 
         google()
         mavenCentral()
-        // Добавлен репозиторий RuStore для загрузки Push SDK
-        maven { url 'https://artifactory-external.vkpartner.ru/artifactory/maven' } 
+        // АКТУАЛЬНЫЙ репозиторий RuStore (старый больше не работает)
+        maven { url 'https://nexus-external.rustore.ru/repository/maven-rustore-exposed' } 
     }
 }
 rootProject.name = "WebViewApp"
