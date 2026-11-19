@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         // --- 2. Настройка кнопки "Позвонить" ---
         callButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_DIAL).apply {
-                data = Uri.parse("tel:+79999999999") // ЗАМЕНИТЕ НА ВАШ НОМЕР
+                data = Uri.parse("tel:+79110372759") // ЗАМЕНИТЕ НА ВАШ НОМЕР
             }
             startActivity(intent)
         }
