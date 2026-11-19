@@ -32,8 +32,8 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import kotlin.math.abs
 
-// Импорты для Push-уведомлений RuStore
-import ru.rustore.sdk.push.RuStorePush
+// Импорт для новой версии RuStore Push SDK
+import ru.rustore.sdk.pushclient.RuStorePushClient
 
 class MainActivity : AppCompatActivity() {
 
@@ -95,9 +95,13 @@ class MainActivity : AppCompatActivity() {
         callButton   = findViewById(R.id.callButton)
         shareButton  = findViewById(R.id.shareButton)
 
-        // --- 1. Инициализация RuStore Push ---
+        // --- 1. Инициализация RuStore Push (Новая версия SDK) ---
         try {
-            RuStorePush.init(applicationContext)
+            RuStorePushClient.init(
+                application = applicationContext,
+                projectId = "YOUR_PROJECT_ID", // ВСТАВЬТЕ СЮДА ВАШ PROJECT ID ИЗ КОНСОЛИ RUSTORE
+                logger = null
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
