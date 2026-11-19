@@ -22,7 +22,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
-import android.widget.Button // Добавлено для кнопки звонка
+import android.widget.Button // Добавлено для кнопок
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.core.view.WindowCompat
@@ -43,7 +43,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var overlay: View
     private lateinit var spinner: IOSSpinnerView
     private lateinit var loadingText: TextView
-    private lateinit var callButton: Button // Переменная для кнопки звонка
+    private lateinit var callButton: Button
+    private lateinit var shareButton: Button
 
     private val handler = Handler(Looper.getMainLooper())
     private var overlayVisible = false
@@ -91,28 +92,35 @@ class MainActivity : AppCompatActivity() {
         spinner     = findViewById(R.id.spinner)
         loadingText = findViewById(R.id.loadingText)
         swipeRefresh = findViewById(R.id.swipeRefresh)
-        callButton   = findViewById(R.id.callButton) // Инициализация кнопки звонка
+        callButton   = findViewById(R.id.callButton)
+        shareButton  = findViewById(R.id.shareButton)
 
         // --- 1. Инициализация RuStore Push ---
         try {
             RuStorePush.init(applicationContext)
         } catch (e: Exception) {
-            // Логируем ошибку, если SDK не подключен
             e.printStackTrace()
         }
 
         // --- 2. Настройка кнопки "Позвонить" ---
         callButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_DIAL).apply {
-                // ЗАМЕНИТЕ НА ВАШ НОМЕР ТЕЛЕФОНА!
-                data = Uri.parse("tel:+79999999999") 
+                data = Uri.parse("tel:+79999999999") // ЗАМЕНИТЕ НА ВАШ НОМЕР
             }
             startActivity(intent)
         }
 
-        swipeRefresh.setColorSchemeColors(
-            android.graphics.Color.parseColor("#6366F1")
-        )
+        // --- 3. Настройка кнопки "Поделиться" ---
+        shareButton.setOnClickListener {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Смотрите, что нашел!")
+                putExtra(Intent.EXTRA_TEXT, "Приложение Aclimat: https://a-climat-atlant.ru")
+            }
+            startActivity(Intent.createChooser(shareIntent, "Поделиться через"))
+        }
+
+        swipeRefresh.setColorSchemeColors(android.graphics.Color.parseColor("#6366F1"))
         val density = resources.displayMetrics.density
         val triggerDp = 120
         try {
@@ -149,8 +157,7 @@ class MainActivity : AppCompatActivity() {
             allowFileAccess                  = true
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(true)
-            
-            // --- 3. Настройки для офлайн-режима (кэширование) ---
+            // --- Настройки для офлайн-режима ---
             cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         }
         
