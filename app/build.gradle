@@ -36,6 +36,9 @@ dependencies {
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // Правильное имя и версия библиотеки RuStore Push
-    implementation("ru.rustore.sdk:pushclient:6.10.0")
+    // Библиотека RuStore Push с исключением проблемных внутренних зависимостей
+    implementation("ru.rustore.sdk:pushclient:6.10.0") {
+        exclude group: 'ru.ok.tracer', module: 'tracer-manifest'
+        exclude group: 'ru.ok.tracer', module: 'tracer-lite-crash-report'
+    }
 }
