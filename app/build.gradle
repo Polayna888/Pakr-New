@@ -7,7 +7,7 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId "{{APP_PACKAGE}}"
-        minSdk 21
+        minSdk 23   // <-- ИЗМЕНЕНО С 21 НА 23
         targetSdk 34
         versionCode {{VERSION_CODE}}
         versionName "{{VERSION_NAME}}"
@@ -36,7 +36,6 @@ dependencies {
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // Библиотека RuStore Push с исключением проблемных внутренних зависимостей
     implementation("ru.rustore.sdk:pushclient:6.10.0") {
         exclude group: 'ru.ok.tracer', module: 'tracer-manifest'
         exclude group: 'ru.ok.tracer', module: 'tracer-lite-crash-report'
