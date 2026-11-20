@@ -22,7 +22,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
-import android.widget.Button // Добавлено для кнопок
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.core.view.WindowCompat
@@ -32,8 +32,9 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import kotlin.math.abs
 
-// Импорт для новой версии RuStore Push SDK
+// Импорты для RuStore Push SDK
 import ru.rustore.sdk.pushclient.RuStorePushClient
+import ru.rustore.sdk.pushclient.common.logger.DefaultLogger
 
 class MainActivity : AppCompatActivity() {
 
@@ -95,12 +96,12 @@ class MainActivity : AppCompatActivity() {
         callButton   = findViewById(R.id.callButton)
         shareButton  = findViewById(R.id.shareButton)
 
-        // --- 1. Инициализация RuStore Push (Новая версия SDK) ---
+        // --- Инициализация RuStore Push (ИСПРАВЛЕНО) ---
         try {
             RuStorePushClient.init(
-                application = applicationContext,
+                application = application, // Передаем application, а не applicationContext
                 projectId = "YOUR_PROJECT_ID", // ВСТАВЬТЕ СЮДА ВАШ PROJECT ID ИЗ КОНСОЛИ RUSTORE
-                logger = null
+                logger = DefaultLogger() // Передаем DefaultLogger вместо null
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -109,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         // --- 2. Настройка кнопки "Позвонить" ---
         callButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_DIAL).apply {
-                data = Uri.parse("tel:+79110372759") // ЗАМЕНИТЕ НА ВАШ НОМЕР
+                data = Uri.parse("tel:+79999999999") // ЗАМЕНИТЕ НА ВАШ НОМЕР
             }
             startActivity(intent)
         }
@@ -161,7 +162,6 @@ class MainActivity : AppCompatActivity() {
             allowFileAccess                  = true
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(true)
-            // --- Настройки для офлайн-режима ---
             cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         }
         
