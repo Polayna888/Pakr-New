@@ -6,8 +6,10 @@ dependencyResolutionManagement {
     repositories { 
         google()
         mavenCentral()
-        // АКТУАЛЬНЫЙ репозиторий RuStore (старый больше не работает)
+        // Репозиторий для основного SDK RuStore
         maven { url 'https://nexus-external.rustore.ru/repository/maven-rustore-exposed' } 
+        // Репозиторий для внутренних зависимостей (tracer и др.)
+        maven { url 'https://artifactory-external.vkpartner.ru/artifactory/maven' }
     }
 }
 rootProject.name = "WebViewApp"
